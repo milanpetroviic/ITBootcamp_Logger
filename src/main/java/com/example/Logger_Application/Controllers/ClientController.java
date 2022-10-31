@@ -1,15 +1,17 @@
 package com.example.Logger_Application.Controllers;
 
 import com.example.Logger_Application.Model.Client;
+import com.example.Logger_Application.Model.ClientRole;
 import com.example.Logger_Application.Repository.ClientRepository;
 import com.example.Logger_Application.Services.ClientService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
-
 @RestController
 public class ClientController {
     ClientRepository clientRepository;
@@ -21,9 +23,17 @@ public class ClientController {
         this.clientService= clientService;
     }
 
-    @GetMapping("/api/clients/all")
-    public List<Client> allClients() {
-        return clientRepository.findAll();
+    @GetMapping("/api/clients")
+    public ResponseEntity<?> allClients(@RequestHeader(HttpHeaders.AUTHORIZATION) String token){
+        ClientRole role = clientService.getRolefromToken(token);
+
+        if(role == null){
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid token.");
+        }
+        if(role!= ClientRole.ADMIN){
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Correct token, but not admin");
+        }
+        return ResponseEntity.status(HttpStatus.OK).body(clientService.allClients());
     }
 
     @PostMapping("/api/clients/register")
@@ -34,17 +44,8 @@ public class ClientController {
         if(clientRepository.existsClientByUsername(client.getUsername())){
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists.");
         }
-        clientRepository.save(client);
-        return ResponseEntity.status(HttpStatus.OK).body("Registered!");
-    }
 
-    @PostMapping("/api/clients/login")
-    public ResponseEntity loginUser(@RequestBody Map<String,String> requestParams) throws Exception{
-        String account=requestParams.get("Account");
-        String password=requestParams.get("Password");
-        if(!clientService.login(account,password).isEmpty()){
-            return ResponseEntity.status(HttpStatus.OK).body("Token : " + clientService.login(account,password));
-        }
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email or username or password incorrect");
+        clientService.save(client);
+        return ResponseEntity.status(HttpStatus.OK).body("Registered!");
     }
 }
